@@ -7,26 +7,14 @@
  */
 
 #import "SDImageAPNGCoder.h"
+#import "SDImageIOAnimatedCoderInternal.h"
 #if SD_MAC
 #import <CoreServices/CoreServices.h>
 #else
 #import <MobileCoreServices/MobileCoreServices.h>
 #endif
 
-// iOS 8 Image/IO framework binary does not contains these APNG contants, so we define them. Thanks Apple :)
-static NSString * kSDCGImagePropertyAPNGLoopCount = @"LoopCount";
-static NSString * kSDCGImagePropertyAPNGDelayTime = @"DelayTime";
-static NSString * kSDCGImagePropertyAPNGUnclampedDelayTime = @"UnclampedDelayTime";
-
 @implementation SDImageAPNGCoder
-
-+ (void)initialize {
-    if (@available(iOS 9, *)) {
-        kSDCGImagePropertyAPNGLoopCount = (__bridge NSString *)kCGImagePropertyAPNGLoopCount;
-        kSDCGImagePropertyAPNGDelayTime = (__bridge NSString *)kCGImagePropertyAPNGDelayTime;
-        kSDCGImagePropertyAPNGUnclampedDelayTime = (__bridge NSString *)kCGImagePropertyAPNGUnclampedDelayTime;
-    }
-}
 
 + (instancetype)sharedCoder {
     static SDImageAPNGCoder *coder;
@@ -44,7 +32,7 @@ static NSString * kSDCGImagePropertyAPNGUnclampedDelayTime = @"UnclampedDelayTim
 }
 
 + (NSString *)imageUTType {
-    return (__bridge NSString *)kUTTypePNG;
+    return (__bridge NSString *)kSDUTTypePNG;
 }
 
 + (NSString *)dictionaryProperty {
@@ -52,15 +40,15 @@ static NSString * kSDCGImagePropertyAPNGUnclampedDelayTime = @"UnclampedDelayTim
 }
 
 + (NSString *)unclampedDelayTimeProperty {
-    return kSDCGImagePropertyAPNGUnclampedDelayTime;
+    return (__bridge NSString *)kCGImagePropertyAPNGUnclampedDelayTime;
 }
 
 + (NSString *)delayTimeProperty {
-    return kSDCGImagePropertyAPNGDelayTime;
+    return (__bridge NSString *)kCGImagePropertyAPNGDelayTime;
 }
 
 + (NSString *)loopCountProperty {
-    return kSDCGImagePropertyAPNGLoopCount;
+    return (__bridge NSString *)kCGImagePropertyAPNGLoopCount;
 }
 
 + (NSUInteger)defaultLoopCount {

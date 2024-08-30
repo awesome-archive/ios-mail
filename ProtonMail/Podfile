@@ -1,143 +1,154 @@
+source 'https://cdn.cocoapods.org/'
 
+def proton_core_path
+  return "git@gitlab.protontech.ch:apple/shared/protoncore.git"
+end
 
+def proton_test_path
+  return "git@gitlab.protontech.ch:apple/shared/pmtestautomation.git"
+end
 
-source 'https://github.com/CocoaPods/Specs.git'
+# proton url is set to env variable because the core module podspecs expect it.
+# it's part of transition into open sourced core modules and it will not be necessary when they are on github
+ENV['PROTON_CORE_GIT_URL'] = proton_core_path
 
-platform :ios, '10.0'
-
+platform :ios, '11.0'
 inhibit_all_warnings!
 use_frameworks!
 
+def proton_core_version
+  '3.25.2'
+end
+
+def crypto_variant
+  "Crypto-Go1.15.15"
+end
+
 def common_pods
-    ##custom
-    #going to remove this soon
-    pod 'OpenPGP', :path => '../OpenPGP'
-    
-    ##
-    #parse respons to core data
-    pod 'Groot', '3.0.1'
-    #networking
-    pod 'AFNetworking', '3.2.1'
-    pod 'AFNetworkActivityLogger', :git => 'https://github.com/AFNetworking/AFNetworkActivityLogger.git', :branch => '3_0_0'
-    
-    #based on 1.0.4
-    pod 'NSDate+Helper', :git => 'https://github.com/ProtonMail/nsdate-helper.git', :branch => 'master'
-    #key chain
-#    pod 'UICKeyChainStore', '2.1.1'
-    
-    #auto layou lib. need to find a replacement
-    pod 'Masonry', '1.1.0'
-    #too old need to find a replacement
-#    pod 'RHAddressBook', '1.1.1'
-    pod 'UIColor+Hex', '1.0.1'
-    pod 'MCSwipeTableViewCell', '~> 2.1.4'
-    
-    pod 'PromiseKit', '~> 6.0'
-    pod 'AwaitKit', '~> 5.0.0'
-    #pod 'ReachabilitySwift' #use this later
-    
-    pod 'Sentry', '4.1.0'
-    pod 'MBProgressHUD' , '1.1.0'
-    
-    pod 'TrustKit', '1.6.2'
+  pod 'AwaitKit', :git => 'https://github.com/yannickl/AwaitKit.git', :commit => '4b725f40dd189f40c0962cba792f06a2073bd977'
+  pod 'Groot', '3.0.1'
+  pod 'Masonry', '1.1.0'
+  pod 'MBProgressHUD' , '1.1.0'
+  pod 'MCSwipeTableViewCell', '2.1.4'
+  pod 'PromiseKit', '6.13.1'
+  pod 'ProtonCore-APIClient', :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-Authentication-KeyGeneration/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-FeatureSwitch', :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-Authentication/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-Common-V5', :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-GoLibs/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-Hash', :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-Keymaker/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-Networking', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-Services', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-UIFoundations-V5', :git => proton_core_path, :tag => proton_core_version
+  pod 'SwiftSoup', '~> 2.3'
+  pod 'TrustKit', :git=> 'https://github.com/ProtonMail/TrustKit.git', :branch => 'release/1.0.3'
 end
 
-#target 'ProtonMail','ProtonMailDev','ProtonMailTests'
 def pm_pods
-    
-    common_pods
-    
-    pod 'SWRevealViewController', '2.3.0'
-    pod 'DKImagePickerController/PhotoGallery', '~> 4.1.7'
+  common_pods
+  pod 'DKImagePickerController/PhotoGallery', '4.3.4'
+  pod 'OHHTTPStubs/Swift', '9.0.0', :configurations => ['Debug', 'Enterprise Debug']
+  pod "ProtonCore-AccountDeletion-V5/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-AccountSwitcher-V5', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-Challenge', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-CoreTranslation-V5', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-CoreTranslation', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-ForceUpgrade-V5', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-Foundations', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-HumanVerification-V5', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-Log', :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-Login/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-LoginUI-V5/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-OpenPGP', :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-Payments/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-PaymentsUI-V5/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-TroubleShooting', :git => proton_core_path, :tag => proton_core_version
+  pod 'SideMenuSwift', '2.0.6'
+  pod 'SwipyCell', :git=> 'https://github.com/xxi511/SwipyCell.git', :commit => '923310a'
+  pod "SkeletonView", '1.30.4'
+  pod 'SQLite.swift', '~> 0.13.3'
 end
 
-# for extensions Share
 def pm_share
-    common_pods
+  common_pods
 end
 
 def pm_siri
-#    pod 'UICKeyChainStore', '2.1.1'
+  pod "ProtonCore-GoLibs/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-Keymaker/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
 end
 
-#targets
+def pm_pushService
+  pod "ProtonCore-GoLibs/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-Doh', :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-Keymaker/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-DataModel', :git => proton_core_path, :tag => proton_core_version
+end
+
 target 'ProtonMail' do
-	pm_pods
-    # Pods for PushService
-    target 'PushService' do
-        inherit! :search_paths
-    end
+  pm_pods
 end
 
-target 'ProtonMailDev' do
-	pm_pods
-    
-    pod 'Fabric'
-    pod 'Crashlytics'
-    
-    # Pods for PushServiceDev
-    target 'PushServiceDev' do
-        inherit! :search_paths
-    end
+target 'PushService' do
+  pm_pushService
 end
 
 target 'ProtonMailTests' do
-    inherit! :search_paths
-    pod 'OpenPGP', :path => '../OpenPGP'
-    pod 'AFNetworking', '3.2.1'
-    pod 'OHHTTPStubs/Swift'
-    pod 'Groot', '3.0.1'
+  inherit! :search_paths
+  pod 'OHHTTPStubs/Swift', '9.0.0'
+  pod 'Groot', '3.0.1'
+  pod 'PromiseKit', '6.13.1'
+  pod 'ProtonCore-Utilities', :git => proton_core_path, :tag => proton_core_version
+  pod 'swift-snapshot-testing', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-TestingToolkit/UnitTests/Core', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-TestingToolkit/UnitTests/Doh', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-TestingToolkit/UnitTests/Services', :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-TestingToolkit/UnitTests/Login/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-TestingToolkit/UnitTests/LoginUI-V5/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-TestingToolkit/UnitTests/DataModel', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-TestingToolkit/UnitTests/Networking', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-TestingToolkit/UnitTests/HumanVerification-V5', :git => proton_core_path, :tag => proton_core_version
+  pod "ProtonCore-TestingToolkit/UnitTests/Authentication/#{crypto_variant}", :git => proton_core_path, :tag => proton_core_version
+  pm_pods
 end
 
 target 'ProtonMailUITests' do
-    inherit! :search_paths
-#    pod 'OpenPGP', :path => '../OpenPGP'
-#    pod 'AFNetworking', '3.2.1'
-#    pod 'OHHTTPStubs/Swift'
-#    pod 'Groot', '3.0.1'
+  inherit! :search_paths
+  pod 'pmtest', :git => proton_test_path, :branch => 'master'
+  pod 'ProtonCore-TestingToolkit/UITests/HumanVerification', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-TestingToolkit/UITests/Login', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-TestingToolkit/UITests/AccountDeletion', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-TestingToolkit/UITests/PaymentsUI', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-QuarkCommands', :git => proton_core_path, :tag => proton_core_version
+  pod 'ProtonCore-Environment', :git => proton_core_path, :tag => proton_core_version
 end
 
 target 'Share' do
-    pm_share
-end
-target 'ShareDev' do
-    pm_share
+  pm_share
 end
 
 target 'Siri' do
-    pm_siri
-end
-target 'SiriDev' do
-    pm_siri
+  pm_siri
 end
 
-
-target 'Keymaker' do
-#    pod 'UICKeyChainStore', '2.1.1'
-    pod 'EllipticCurveKeyPair', '1.0.2'
-end
-
-target 'KeymakerTests' do
-    pod 'CryptoSwift', '0.12.0'
-    inherit! :search_paths
+target 'ProtonMailAnalytics' do
+  pod 'Sentry', :git => 'https://github.com/getsentry/sentry-cocoa.git', :tag => '7.31.2'
 end
 
 post_install do | installer |
-    require 'fileutils'
-    FileUtils.cp_r('Pods/Target Support Files/Pods-ProtonMail/Pods-ProtonMail-Acknowledgements.plist', 'ProtonMail/Supporting Files/Settings.bundle/Acknowledgements.plist', :remove_destination => true)
-    
-    installer.pods_project.targets.each do |target|
-        target.build_configurations.each do |config|
-            config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '10.0'
-            config.build_settings['SWIFT_VERSION'] = '4.2'
-            if config.name == 'Release'
-                config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Owholemodule'
-                else
-                config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
-            end
-        end
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '11.0'
+      config.build_settings['SWIFT_VERSION'] = '5.0'
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+      config.build_settings['CODE_SIGN_IDENTITY'] = ''
+      if config.name.include? 'Release'
+        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Owholemodule'
+        else
+        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+      end
     end
+  end
 end
-
-
-

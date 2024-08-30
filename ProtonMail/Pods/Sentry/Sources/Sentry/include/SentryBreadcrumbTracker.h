@@ -1,15 +1,18 @@
-//
-//  SentryBreadcrumbTracker.h
-//  Sentry
-//
-//  Created by Daniel Griesser on 31/05/2017.
-//  Copyright © 2017 Sentry. All rights reserved.
-//
+#import "SentryDefines.h"
 
-#import <Foundation/Foundation.h>
+NS_ASSUME_NONNULL_BEGIN
+
+@class SentrySwizzleWrapper;
 
 @interface SentryBreadcrumbTracker : NSObject
+SENTRY_NO_INIT
+
+- (instancetype)initWithSwizzleWrapper:(SentrySwizzleWrapper *)swizzleWrapper;
 
 - (void)start;
+- (void)startSwizzle;
+- (void)stop;
 
 @end
+
+NS_ASSUME_NONNULL_END

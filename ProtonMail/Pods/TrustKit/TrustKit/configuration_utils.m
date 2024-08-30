@@ -9,14 +9,23 @@
  
  */
 
+/* For parsing IP addresses */
+#import <arpa/inet.h>
+
 #import "configuration_utils.h"
 #import "TSKTrustKitConfig.h"
 #import "Dependencies/domain_registry/domain_registry.h"
 #import "TSKLog.h"
 
-
 static NSUInteger isSubdomain(NSString *domain, NSString *subdomain)
 {
+    // Corner case: the supplied subdomain is actually a parent domain
+    // Should never happen but https://github.com/datatheorem/TrustKit/issues/210
+    if ([subdomain length] <= [domain length])
+    {
+        return 0;
+    }
+
     // Ensure that the TLDs are the same; this can get tricky with TLDs like .co.uk so we take a cautious approach
     size_t domainRegistryLength = GetRegistryLength([domain UTF8String]);
     size_t subdomainRegistryLength = GetRegistryLength([subdomain UTF8String]);
@@ -64,6 +73,16 @@ NSString * _Nullable getPinningConfigurationKeyForDomain(NSString * _Nonnull hos
             {
                 // Is the server a subdomain of this pinned server?
                 TSKLog(@"Checking includeSubdomains configuration for %@", pinnedServerName);
+                if ([domainPinningPolicies[pinnedServerName][kTSKForceSubdomainMatch] boolValue])
+                {
+                    TSKLog(@"Checking includeSubdomains by forced configuration for %@", pinnedServerName);
+                    if( [hostname hasSuffix:pinnedServerName] )
+                    {
+                        notedHostname = pinnedServerName;
+                        break;
+                    }
+                }
+                
                 NSUInteger currentMatch = isSubdomain(pinnedServerName, hostname);
                 if (currentMatch > 0 && currentMatch > bestMatch)
                 {
@@ -76,6 +95,28 @@ NSString * _Nullable getPinningConfigurationKeyForDomain(NSString * _Nonnull hos
                 {
                     TSKLog(@"Not applying includeSubdomains configuration from %@ to %@ (current match of %d chars does not exceed best match)", pinnedServerName, hostname, currentMatch);
                 }
+            }
+        }
+
+        // Didn't find anything in the loop
+        if (notedHostname == nil && domainPinningPolicies[kTSKCatchallPolicy] != nil)
+        {
+            if ([domainPinningPolicies[kTSKCatchallPolicy][kTSKAllowIPsOnly] boolValue]) {
+                struct in6_addr addr = {};
+                const char *hostnameCString = [hostname UTF8String];
+
+                // We don't actually want to get at the address, we just want to know if it's valid or not
+                if (inet_pton(AF_INET,  hostnameCString, &addr) ||
+                    inet_pton(AF_INET6, hostnameCString, &addr))
+                {
+                    TSKLog(@"Using catchall policy (allowing IPs) for hostname %@", hostname);
+                    notedHostname = kTSKCatchallPolicy;
+                }
+            }
+            else
+            {
+                TSKLog(@"Using catchall policy for hostname %@", hostname);
+                notedHostname = kTSKCatchallPolicy;
             }
         }
     }

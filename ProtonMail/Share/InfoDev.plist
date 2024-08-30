@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en_US</string>
 	<key>CFBundleDisplayName</key>
-	<string>ProtonMail</string>
+	<string>Proton Mail</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -17,7 +17,7 @@
 	<key>CFBundlePackageType</key>
 	<string>XPC!</string>
 	<key>CFBundleShortVersionString</key>
-	<string>$(MARKETING_VERSION)</string>
+	<string>4.2.4</string>
 	<key>CFBundleVersion</key>
 	<string>Debug</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
@@ -32,7 +32,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Required for attaching photos to the email.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>Required for email autocomplete.</string>
+	<string>Used for accessing email addresses for contacts saved on the device so they can be used when composing a message or when manually uploading the device contacts to your account. Contact information is not uploaded to our servers without an explicit action to do so.</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>
@@ -76,14 +76,12 @@
 		<string>ShareExtensionEntry</string>
 	</dict>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Allows you quick and secure to unlock your application.</string>
+	<string>Lets you quickly and securely unlock your application.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Required for saving image attachments to photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Required for attaching photos to the email.</string>
 	<key>UISupportsDocumentBrowser</key>
 	<false/>
-	<key>UIUserInterfaceStyle</key>
-	<string>Light</string>
 </dict>
 </plist>

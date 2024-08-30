@@ -1,3 +1,5 @@
+| ⚠️ The `master` branch has been discontinued. For the latest Proton Mail codebase please check the `main` branch ⚠️ |
+| --- |
 
 # iOS-mail
 
@@ -5,7 +7,7 @@
 
 iOS-mail — ProtonMail iOS client app
 
-The app is intended for all users of the ProtonMail service. Whether they are paid or free, they can compose and read emails, manage folders and labels, manage some account settings and create a new account. The app supports iOS 10-13.
+The app is intended for all users of the ProtonMail service. Whether they are paid or free, they can compose and read emails, manage folders and labels, manage some account settings and create a new account. The app supports iOS versions 11 and above.
 
 ## License
 
@@ -53,8 +55,6 @@ See [LICENSE](LICENSE) file
 - [OpenPGP](OpenPGP/README.md)
 - [Keymaker](ProtonMail/Keymaker/README.md)
 - [ProtonMail](ProtonMail/ProtonMail/README.md)
-- [ProtonMailCommon](ProtonMail/ProtonMailCommon/README.md)
-- [Push](ProtonMail/Push/README.md)
 - [PushService](ProtonMail/PushService/README.md)
 - [Share](ProtonMail/Share/README.md)
 - [Siri](ProtonMail/Siri/README.md)
@@ -65,32 +65,28 @@ See [LICENSE](LICENSE) file
 
 ## Setup
 
-1. Have macOS up to date and install Xcode 11.1
-2. We use xUnique (ver 4.1.4) in order to prevent merge conflicts in the ProtonMail.xcodeproj file. Each shared scheme has a post-build action, and builds will fail on machines with no xUnique installed. Please follow xUnique's [installation instructions](https://github.com/truebit/xUnique)
-3. `DOMPurify`(@b06b6b2ac8) and Cocoapods are pre-downloaded. We are using git submodules for tracking DOMPurifier, so after cloning you have to run `git submodule init` and `git submodule update` to fetch it. Theory here: https://git-scm.com/book/en/v2/Git-Tools-Submodules
-4. Open `ProtonMail/ProtonMail.xcworkspace` and click the run button
+1. Have macOS up to date and install Xcode 14 +
+2. We are using [Mint](https://github.com/yonaskolb/mint) as our package manager, If you don't have it, you can install it via [Homebrew](https://brew.sh/) by `brew bundle --file="ProtonMail/Brewfile" --no-upgrade` then run `mint bootstrap` to install dependecies
+3. [DOMPurify](https://github.com/cure53/DOMPurify) and Cocoapods are pre-downloaded. We are using git submodules for tracking DOMPurifier, so after cloning you have to run `git submodule init` and `git submodule update` to fetch it. Theory here: https://git-scm.com/book/en/v2/Git-Tools-Submodules
+4. We are using [XcodeGen](https://github.com/yonaskolb/XcodeGen) to generate Xcode project, `sh ProtonMail/xcodeGenHelper.sh`
+5. Open `ProtonMail/ProtonMail.xcworkspace` and update project settings to use your own provisioning profile.
+6. Run the app.
 
 ## Live version
 
-Current live version 1.11.13
+Current live version 4.2.2
 
-- [Changelogs](Changelog.md)
 - [Apple Store](https://apps.apple.com/app/protonmail-encrypted-email/id979659905)
 
 ## Articles
 
-- [Open sourcing](https://protonmail.com/blog/ios-open-source)
-- [Security model](https://protonmail.com/blog/ios-security-model)
+- [Open sourcing](https://proton.me/blog/ios-open-source)
+- [Security model](https://proton.me/blog/ios-security-model)
 
 ## Our Team
 
-- [Feng](https://github.com/zhj4478)
-- [Anatoly](https://github.com/abjurato)
-- [Henry](https://github.com/henrybear327)
-- [Emil](https://github.com/emnproton)
-
-## TODO
-
- - [ ] UI redesign
- - [ ] multiple user support
- - [ ] share frameworks
+- [Anson](https://github.com/xxi511)
+- [Mustapha](https://github.com/justarandomdev)
+- [Steven](https://github.com/Linquas)
+- [Jacek](https://github.com/jacekkra)
+- [Xavi](https://github.com/xavigil)

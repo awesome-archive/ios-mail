@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%d VPN connections</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d conexiuni VPN</string>
+			<key>one</key>
+			<string>O conexiune VPN</string>
+			<key>other</key>
+			<string>%d de conexiuni VPN</string>
+		</dict>
+	</dict>
+	<key>%d addresses &amp; calendars</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d adrese &amp; calendare</string>
+			<key>one</key>
+			<string>O adresă &amp; un calendar</string>
+			<key>other</key>
+			<string>%d de adrese &amp; calendare</string>
+		</dict>
+	</dict>
+	<key>%d calendars</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d calendare</string>
+			<key>one</key>
+			<string>Un calendar</string>
+			<key>other</key>
+			<string>%d de calendare</string>
+		</dict>
+	</dict>
+	<key>%d calendars / user</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d calendars / user</string>
+			<key>one</key>
+			<string>%d calendar / user</string>
+			<key>other</key>
+			<string>%d calendars / user</string>
+		</dict>
+	</dict>
+	<key>%d connections</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d conexiuni</string>
+			<key>one</key>
+			<string>O conexiune</string>
+			<key>other</key>
+			<string>%d de conexiuni</string>
+		</dict>
+	</dict>
+	<key>%d countries</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d țări</string>
+			<key>one</key>
+			<string>O țară</string>
+			<key>other</key>
+			<string>%d de țări</string>
+		</dict>
+	</dict>
+	<key>%d custom domains</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d domenii personale</string>
+			<key>one</key>
+			<string>Un domeniu personal</string>
+			<key>other</key>
+			<string>%d de domenii personale</string>
+		</dict>
+	</dict>
+	<key>%d email addresses</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d adrese de e-mail</string>
+			<key>one</key>
+			<string>O adresă de e-mail</string>
+			<key>other</key>
+			<string>%d de adrese de e-mail</string>
+		</dict>
+	</dict>
+	<key>%d email addresses / user</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d email addresses / user</string>
+			<key>one</key>
+			<string>%d email address / user</string>
+			<key>other</key>
+			<string>%d email addresses / user</string>
+		</dict>
+	</dict>
+	<key>%d folders / labels</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d folders / labels</string>
+			<key>one</key>
+			<string>%d folder / label</string>
+			<key>other</key>
+			<string>%d folders / labels</string>
+		</dict>
+	</dict>
+	<key>%d high-speed VPN connections</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d conexiuni VPN de mare viteză</string>
+			<key>one</key>
+			<string>O conexiune VPN de mare viteză</string>
+			<key>other</key>
+			<string>%d de conexiuni VPN de mare viteză</string>
+		</dict>
+	</dict>
+	<key>%d high-speed VPN connections / user</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d high-speed VPN connections / user</string>
+			<key>one</key>
+			<string>%d high-speed VPN connection / user</string>
+			<key>other</key>
+			<string>%d high-speed VPN connections / user</string>
+		</dict>
+	</dict>
+	<key>%d users</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@VARIABLE@</string>
+		<key>VARIABLE</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>few</key>
+			<string>%d utilizatori</string>
+			<key>one</key>
+			<string>Un utilizator</string>
+			<key>other</key>
+			<string>%d de utilizatori</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

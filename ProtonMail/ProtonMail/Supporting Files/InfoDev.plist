@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en_US</string>
 	<key>CFBundleDisplayName</key>
-	<string>ProtonMail</string>
+	<string>Proton Mail</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -46,11 +46,11 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>Proton Mail</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>$(MARKETING_VERSION)</string>
+	<string>4.2.4</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleURLTypes</key>
@@ -65,23 +65,19 @@
 				<string>protonmail</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Mailto</string>
+			<key>CFBundleURLName</key>
+			<string>mailto</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>mailto</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>Debug</string>
-	<key>Fabric</key>
-	<dict>
-		<key>APIKey</key>
-		<string>982063ac8b41a8754cf79640ebab8b392ebe7e86</string>
-		<key>Kits</key>
-		<array>
-			<dict>
-				<key>KitInfo</key>
-				<dict/>
-				<key>KitName</key>
-				<string>Crashlytics</string>
-			</dict>
-		</array>
-	</dict>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>org-appextension-feature-password-management</string>
@@ -115,9 +111,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Required for attaching photos to the email.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>Required for email autocomplete.</string>
+	<string>Used for accessing email addresses for contacts saved on the device so they can be used when composing a message or when manually uploading the device contacts to your account. Contact information is not uploaded to our servers without an explicit action to do so.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Allows you quick and secure to unlock your application.</string>
+	<string>Lets you quickly and securely unlock your application.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Required for saving image attachments to photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -142,7 +138,7 @@
 		<string>remote-notification</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
+	<string>MailLaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>armv7</string>
@@ -150,7 +146,7 @@
 	<key>UIStatusBarHidden</key>
 	<false/>
 	<key>UIStatusBarStyle</key>
-	<string>UIStatusBarStyleBlackTranslucent</string>
+	<string>UIStatusBarStyleDarkContent</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -160,8 +156,6 @@
 	</array>
 	<key>UISupportsDocumentBrowser</key>
 	<false/>
-	<key>UIUserInterfaceStyle</key>
-	<string>Light</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>

@@ -13,16 +13,47 @@
 #import "UIImage+Metadata.h"
 #import "SDInternalMacros.h"
 
-UIImage * _Nullable SDImageCacheDecodeImageData(NSData * _Nonnull imageData, NSString * _Nonnull cacheKey, SDWebImageOptions options, SDWebImageContext * _Nullable context) {
-    UIImage *image;
+SDImageCoderOptions * _Nonnull SDGetDecodeOptionsFromContext(SDWebImageContext * _Nullable context, SDWebImageOptions options, NSString * _Nonnull cacheKey) {
     BOOL decodeFirstFrame = SD_OPTIONS_CONTAINS(options, SDWebImageDecodeFirstFrameOnly);
     NSNumber *scaleValue = context[SDWebImageContextImageScaleFactor];
     CGFloat scale = scaleValue.doubleValue >= 1 ? scaleValue.doubleValue : SDImageScaleFactorForKey(cacheKey);
-    SDImageCoderOptions *coderOptions = @{SDImageCoderDecodeFirstFrameOnly : @(decodeFirstFrame), SDImageCoderDecodeScaleFactor : @(scale)};
-    if (context) {
-        SDImageCoderMutableOptions *mutableCoderOptions = [coderOptions mutableCopy];
-        [mutableCoderOptions setValue:context forKey:SDImageCoderWebImageContext];
-        coderOptions = [mutableCoderOptions copy];
+    NSNumber *preserveAspectRatioValue = context[SDWebImageContextImagePreserveAspectRatio];
+    NSValue *thumbnailSizeValue;
+    BOOL shouldScaleDown = SD_OPTIONS_CONTAINS(options, SDWebImageScaleDownLargeImages);
+    if (shouldScaleDown) {
+        CGFloat thumbnailPixels = SDImageCoderHelper.defaultScaleDownLimitBytes / 4;
+        CGFloat dimension = ceil(sqrt(thumbnailPixels));
+        thumbnailSizeValue = @(CGSizeMake(dimension, dimension));
+    }
+    if (context[SDWebImageContextImageThumbnailPixelSize]) {
+        thumbnailSizeValue = context[SDWebImageContextImageThumbnailPixelSize];
+    }
+    
+    SDImageCoderMutableOptions *mutableCoderOptions = [NSMutableDictionary dictionaryWithCapacity:2];
+    mutableCoderOptions[SDImageCoderDecodeFirstFrameOnly] = @(decodeFirstFrame);
+    mutableCoderOptions[SDImageCoderDecodeScaleFactor] = @(scale);
+    mutableCoderOptions[SDImageCoderDecodePreserveAspectRatio] = preserveAspectRatioValue;
+    mutableCoderOptions[SDImageCoderDecodeThumbnailPixelSize] = thumbnailSizeValue;
+    mutableCoderOptions[SDImageCoderWebImageContext] = context;
+    SDImageCoderOptions *coderOptions = [mutableCoderOptions copy];
+    
+    return coderOptions;
+}
+
+UIImage * _Nullable SDImageCacheDecodeImageData(NSData * _Nonnull imageData, NSString * _Nonnull cacheKey, SDWebImageOptions options, SDWebImageContext * _Nullable context) {
+    NSCParameterAssert(imageData);
+    NSCParameterAssert(cacheKey);
+    UIImage *image;
+    SDImageCoderOptions *coderOptions = SDGetDecodeOptionsFromContext(context, options, cacheKey);
+    BOOL decodeFirstFrame = SD_OPTIONS_CONTAINS(options, SDWebImageDecodeFirstFrameOnly);
+    CGFloat scale = [coderOptions[SDImageCoderDecodeScaleFactor] doubleValue];
+    
+    // Grab the image coder
+    id<SDImageCoder> imageCoder;
+    if ([context[SDWebImageContextImageCoder] conformsToProtocol:@protocol(SDImageCoder)]) {
+        imageCoder = context[SDWebImageContextImageCoder];
+    } else {
+        imageCoder = [SDImageCodersManager sharedManager];
     }
     
     if (!decodeFirstFrame) {
@@ -44,7 +75,7 @@ UIImage * _Nullable SDImageCacheDecodeImageData(NSData * _Nonnull imageData, NSS
         }
     }
     if (!image) {
-        image = [[SDImageCodersManager sharedManager] decodedImageWithData:imageData options:coderOptions];
+        image = [imageCoder decodedImageWithData:imageData options:coderOptions];
     }
     if (image) {
         BOOL shouldDecode = !SD_OPTIONS_CONTAINS(options, SDWebImageAvoidDecodeImage);
@@ -56,13 +87,10 @@ UIImage * _Nullable SDImageCacheDecodeImageData(NSData * _Nonnull imageData, NSS
             shouldDecode = NO;
         }
         if (shouldDecode) {
-            BOOL shouldScaleDown = SD_OPTIONS_CONTAINS(options, SDWebImageScaleDownLargeImages);
-            if (shouldScaleDown) {
-                image = [SDImageCoderHelper decodedAndScaledDownImageWithImage:image limitBytes:0];
-            } else {
-                image = [SDImageCoderHelper decodedImageWithImage:image];
-            }
+            image = [SDImageCoderHelper decodedImageWithImage:image];
         }
+        // assign the decode options, to let manager check whether to re-decode if needed
+        image.sd_decodeOptions = coderOptions;
     }
     
     return image;

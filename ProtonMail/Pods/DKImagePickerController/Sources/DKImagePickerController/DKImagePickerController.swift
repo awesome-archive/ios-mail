@@ -8,7 +8,6 @@
 
 import UIKit
 import Photos
-import AssetsLibrary
 
 /**
  - AllPhotos: Get all photos assets in the assets group.
@@ -56,7 +55,7 @@ internal protocol DKImagePickerControllerObserver {
 open class DKUINavigationController: UINavigationController {}
 
 @objc
-open class DKImagePickerController: DKUINavigationController, DKImageBaseManagerObserver {
+open class DKImagePickerController: DKUINavigationController, DKImageBaseManagerObserver, UIAdaptivePresentationControllerDelegate {
     
     /// Use UIDelegate to Customize the picker UI.
     @objc public var UIDelegate: DKImagePickerControllerBaseUIDelegate! {
@@ -65,6 +64,12 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
         }
     }
     
+    /// false to prevent dismissal of the picker when the presentation controller will dismiss in response to user action.
+    @available(iOS 13.0, *)
+    @objc public var shouldDismissViaUserAction: Bool {
+        return false
+    }
+
     /// Forces deselect of previous selected image. allowSwipeToSelect will be ignored.
     @objc public var singleSelect = false
     
@@ -158,10 +163,12 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
         return DKImageGroupDataManager(configuration: configuration)
     }()
     
+    private var isInlineCamera: Bool { return self.sourceType == .camera }
+    
     public private(set) var selectedAssetIdentifiers = [String]() // DKAsset.localIdentifier
     private var assets = [String : DKAsset]() // DKAsset.localIdentifier : DKAsset
     
-    private lazy var extensionController: DKImageExtensionController! = {
+    public lazy var extensionController: DKImageExtensionController! = {
         return DKImageExtensionController(imagePickerController: self)
     }()
     
@@ -192,13 +199,13 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
             self.exporter = DKImageAssetExporter.sharedInstance
         }
         
-        if self.inline || self.sourceType == .camera {
+        if self.inline || self.isInlineCamera {
             self.isNavigationBarHidden = true
         } else {
             self.isNavigationBarHidden = false
         }
         
-        if self.sourceType != .camera {
+        if !self.isInlineCamera {
             let rootVC = self.makeRootVC()
             rootVC.imagePickerController = self
             self.rootVC = rootVC
@@ -227,9 +234,13 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
         
         self.doSetupOnce()
         
-        if self.needShowInlineCamera && self.sourceType == .camera {
+        if #available(iOS 13, *), self.presentingViewController != nil, self.presentationController?.delegate == nil {
+            self.presentationController?.delegate = self
+        }
+        
+        if self.needShowInlineCamera && self.isInlineCamera {
             self.needShowInlineCamera = false
-            self.showCamera(isInline: true)
+            self.showCamera()
         }
     }
     
@@ -238,7 +249,7 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
     }
     
     @objc open func presentCamera() {
-        self.showCamera(isInline: false)
+        self.showCamera()
     }
     
     @objc open override func present(_ viewControllerToPresent: UIViewController,
@@ -269,8 +280,8 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
         }
     }
     
-    @objc open func dismissCamera(isInline: Bool = false) {
-        self.extensionController.finish(extensionType: isInline ? .inlineCamera : .camera)
+    @objc open func dismissCamera() {
+        self.extensionController.finish(extensionType: self.isInlineCamera ? .inlineCamera : .camera)
     }
     
     @objc open func dismiss() {
@@ -279,7 +290,7 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
         self.presentingViewController?.dismiss(animated: true, completion: {
             self.didCancel?()
             
-            if self.sourceType == .camera {
+            if self.isInlineCamera {
                 self.needShowInlineCamera = true
             }
         })
@@ -294,7 +305,7 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
             
             self.didSelectAssets?(assets)
             
-            if self.sourceType == .camera {
+            if self.isInlineCamera {
                 self.needShowInlineCamera = true
             }
         }
@@ -383,21 +394,20 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
         return assetFetchOptions
     }
     
-    private var metadataFromCamera: [AnyHashable : Any]?
-    private func showCamera(isInline: Bool) {
+    private func didCancelCamera() {
+        self.dismissCamera()
+        if self.isInlineCamera {
+            self.dismiss()
+        }
+    }
+    
+    private func showCamera() {
         let didCancel = { [unowned self] () in
-            if self.sourceType == .camera {
-                self.dismissCamera(isInline: true)
-                self.dismiss()
-            } else {
-                self.dismissCamera()
-            }
+            self.didCancelCamera()
         }
         
         let didFinishCapturingImage = { [weak self] (image: UIImage, metadata: [AnyHashable : Any]?) in
             if let strongSelf = self {
-                strongSelf.metadataFromCamera = metadata
-                
                 let didFinishEditing: ((UIImage, [AnyHashable : Any]?) -> Void) = { (image, metadata) in
                     self?.processImageFromCamera(image, metadata)
                 }
@@ -429,7 +439,7 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
                     if success {
                         if let newAsset = PHAsset.fetchAssets(withLocalIdentifiers: [newVideoIdentifier],
                                                               options: nil).firstObject {
-                            if self.sourceType != .camera || self.viewControllers.count == 0 {
+                            if !self.isInlineCamera || self.viewControllers.count == 0 {
                                 self.dismissCamera()
                             }
                             self.select(asset: DKAsset(originalAsset: newAsset))
@@ -441,7 +451,7 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
             }
         }
         
-        self.extensionController.perform(extensionType: isInline ? .inlineCamera : .camera, with: [
+        self.extensionController.perform(extensionType: isInlineCamera ? .inlineCamera : .camera, with: [
             "didFinishCapturingImage" : didFinishCapturingImage,
             "didFinishCapturingVideo" : didFinishCapturingVideo,
             "didCancel" : didCancel,
@@ -459,7 +469,7 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
     
     internal func processImageFromCamera(_ image: UIImage, _ metadata: [AnyHashable : Any]?) {
         self.saveImage(image, metadata) { asset in
-            if self.sourceType != .camera {
+            if !self.isInlineCamera {
                 self.dismissCamera()
             }
             self.select(asset: asset)
@@ -474,14 +484,10 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
         if let metadata = metadata {
             let imageData = image.jpegData(compressionQuality: 1)!
             
-            if #available(iOS 9.0, *) {
-                if let imageDataWithMetadata = self.writeMetadata(metadata, into: imageData) {
-                    self.saveImageDataToAlbumForiOS9(imageDataWithMetadata, completeBlock)
-                } else {
-                    self.saveImageDataToAlbumForiOS9(imageData, completeBlock)
-                }
+            if let imageDataWithMetadata = self.writeMetadata(metadata, into: imageData) {
+                self.saveImageDataToAlbumForiOS9(imageDataWithMetadata, completeBlock)
             } else {
-                self.saveImageDataToAlbumForiOS8(imageData, metadata, completeBlock)
+                self.saveImageDataToAlbumForiOS9(imageData, completeBlock)
             }
         } else {
             self.saveImageToAlbum(image, completeBlock)
@@ -505,41 +511,34 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
         }
     }
     
-    @objc open func saveImageDataToAlbumForiOS8(_ imageData: Data,
-                                                _ metadata: Dictionary<AnyHashable, Any>?,
-                                                _ completeBlock: @escaping ((_ asset: DKAsset) -> Void)) {
-        let library = ALAssetsLibrary()
-        library.writeImageData(toSavedPhotosAlbum: imageData, metadata: metadata, completionBlock: { (newURL, error) in
-            if let _ = error {
-                completeBlock(DKAsset(image: UIImage(data: imageData)!))
-            } else {
-                if let newAsset = PHAsset.fetchAssets(withALAssetURLs: [newURL!], options: nil).firstObject {
-                    completeBlock(DKAsset(originalAsset: newAsset))
-                }
-            }
-        })
-    }
-    
     @objc open func saveImageDataToAlbumForiOS9(_ imageDataWithMetadata: Data, _ completeBlock: @escaping ((_ asset: DKAsset) -> Void)) {
-        var newImageIdentifier: String!
+        var newImageIdentifier: String = ""
         
         PHPhotoLibrary.shared().performChanges({
-            if #available(iOS 9.0, *) {
-                let assetRequest = PHAssetCreationRequest.forAsset()
-                assetRequest.addResource(with: .photo, data: imageDataWithMetadata, options: nil)
-                newImageIdentifier = assetRequest.placeholderForCreatedAsset!.localIdentifier
-            } else {
-                // Fallback on earlier versions
-            }
+            let assetRequest = PHAssetCreationRequest.forAsset()
+            assetRequest.addResource(with: .photo, data: imageDataWithMetadata, options: nil)
+            newImageIdentifier = assetRequest.placeholderForCreatedAsset?.localIdentifier ?? ""
         }) { (success, error) in
             DispatchQueue.main.async(execute: {
+                if newImageIdentifier.isEmpty, let img =  UIImage(data: imageDataWithMetadata) {
+                    completeBlock(DKAsset(image: img))
+                    return
+                }
+                if newImageIdentifier.isEmpty {
+                    completeBlock(DKAsset(image: UIImage()))
+                    return
+                }
+
                 if success, let newAsset = PHAsset.fetchAssets(withLocalIdentifiers: [newImageIdentifier], options: nil).firstObject {
                     completeBlock(DKAsset(originalAsset: newAsset))
                 } else {
-                    completeBlock(DKAsset(image: UIImage(data: imageDataWithMetadata)!))
+                    if let img =  UIImage(data: imageDataWithMetadata) {
+                        completeBlock(DKAsset(image: img))
+                    } else {
+                        completeBlock(DKAsset(image: UIImage()))
+                    }
                 }
             })
-            
         }
     }
     
@@ -586,7 +585,7 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
         if insertedAssets.count > 0 {
             self.clearSelectedAssetsCache()
             
-            if self.sourceType == .camera || (self.singleSelect && self.autoCloseOnSingleSelect) {
+            if self.isInlineCamera || (self.singleSelect && self.autoCloseOnSingleSelect) {
                 self.done()
             } else {
                 self.triggerSelectedChangedIfNeeded()
@@ -670,8 +669,20 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
         }
     }
     
-    @objc func contains(asset: DKAsset) -> Bool {
+    @objc open func contains(asset: DKAsset) -> Bool {
         return self.assets[asset.localIdentifier] != nil
+    }
+  
+    @objc open func scroll(to indexPath: IndexPath, animated: Bool = false) {
+        if let groupDetailVC = self.viewControllers.first as? DKAssetGroupDetailVC {
+            groupDetailVC.scroll(to: indexPath, animted: animated)
+        }
+    }
+    
+    @objc open func scrollToLastTappedIndexPath(animated: Bool = false) {
+        if let groupDetailVC = self.viewControllers.first as? DKAssetGroupDetailVC {
+            groupDetailVC.scrollToLastIndexPath(animated: animated)
+        }
     }
     
     private var internalSelectedAssetsCache: [DKAsset]?
@@ -747,7 +758,7 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
     // MARK: - Orientation
     
     @objc open override var shouldAutorotate : Bool {
-        return self.allowsLandscape && self.sourceType != .camera ? true : false
+        return self.allowsLandscape && !self.isInlineCamera ? true : false
     }
     
     @objc open override var supportedInterfaceOrientations : UIInterfaceOrientationMask {
@@ -755,6 +766,21 @@ open class DKImagePickerController: DKUINavigationController, DKImageBaseManager
             return super.supportedInterfaceOrientations
         } else {
             return UIInterfaceOrientationMask.portrait
+        }
+    }
+    
+    // MARK: - UIAdaptivePresentationControllerDelegate
+    
+    @available(iOS 13.0, *)
+    public func presentationControllerShouldDismiss(_ presentationController: UIPresentationController) -> Bool {
+        return self.shouldDismissViaUserAction
+    }
+    
+    public func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        if self.isInlineCamera {
+            self.didCancelCamera()
+        } else {
+            self.dismiss()
         }
     }
     

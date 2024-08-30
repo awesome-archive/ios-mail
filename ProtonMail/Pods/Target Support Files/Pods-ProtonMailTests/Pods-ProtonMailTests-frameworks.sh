@@ -19,9 +19,8 @@ mkdir -p "${CONFIGURATION_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}"
 
 COCOAPODS_PARALLEL_CODE_SIGN="${COCOAPODS_PARALLEL_CODE_SIGN:-false}"
 SWIFT_STDLIB_PATH="${DT_TOOLCHAIN_DIR}/usr/lib/swift/${PLATFORM_NAME}"
+BCSYMBOLMAP_DIR="BCSymbolMaps"
 
-# Used as a return value for each invocation of `strip_invalid_archs` function.
-STRIP_BINARY_RETVAL=0
 
 # This protects against multiple targets copying the same framework dependency at the same time. The solution
 # was originally proposed here: https://lists.samba.org/archive/rsync/2008-February/020158.html
@@ -45,9 +44,19 @@ install_framework()
     source="$(readlink "${source}")"
   fi
 
+  if [ -d "${source}/${BCSYMBOLMAP_DIR}" ]; then
+    # Locate and install any .bcsymbolmaps if present, and remove them from the .framework before the framework is copied
+    find "${source}/${BCSYMBOLMAP_DIR}" -name "*.bcsymbolmap"|while read f; do
+      echo "Installing $f"
+      install_bcsymbolmap "$f" "$destination"
+      rm "$f"
+    done
+    rmdir "${source}/${BCSYMBOLMAP_DIR}"
+  fi
+
   # Use filter instead of exclude so missing patterns don't throw errors.
-  echo "rsync --delete -av "${RSYNC_PROTECT_TMP_FILES[@]}" --filter \"- CVS/\" --filter \"- .svn/\" --filter \"- .git/\" --filter \"- .hg/\" --filter \"- Headers\" --filter \"- PrivateHeaders\" --filter \"- Modules\" \"${source}\" \"${destination}\""
-  rsync --delete -av "${RSYNC_PROTECT_TMP_FILES[@]}" --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "${source}" "${destination}"
+  echo "rsync --delete -av "${RSYNC_PROTECT_TMP_FILES[@]}" --links --filter \"- CVS/\" --filter \"- .svn/\" --filter \"- .git/\" --filter \"- .hg/\" --filter \"- Headers\" --filter \"- PrivateHeaders\" --filter \"- Modules\" \"${source}\" \"${destination}\""
+  rsync --delete -av "${RSYNC_PROTECT_TMP_FILES[@]}" --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "${source}" "${destination}"
 
   local basename
   basename="$(basename -s .framework "$1")"
@@ -80,33 +89,67 @@ install_framework()
     done
   fi
 }
-
 # Copies and strips a vendored dSYM
 install_dsym() {
   local source="$1"
+  warn_missing_arch=${2:-true}
   if [ -r "$source" ]; then
-    # Copy the dSYM into a the targets temp dir.
+    # Copy the dSYM into the targets temp dir.
     echo "rsync --delete -av "${RSYNC_PROTECT_TMP_FILES[@]}" --filter \"- CVS/\" --filter \"- .svn/\" --filter \"- .git/\" --filter \"- .hg/\" --filter \"- Headers\" --filter \"- PrivateHeaders\" --filter \"- Modules\" \"${source}\" \"${DERIVED_FILES_DIR}\""
     rsync --delete -av "${RSYNC_PROTECT_TMP_FILES[@]}" --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "${source}" "${DERIVED_FILES_DIR}"
 
     local basename
-    basename="$(basename -s .framework.dSYM "$source")"
-    binary="${DERIVED_FILES_DIR}/${basename}.framework.dSYM/Contents/Resources/DWARF/${basename}"
+    basename="$(basename -s .dSYM "$source")"
+    binary_name="$(ls "$source/Contents/Resources/DWARF")"
+    binary="${DERIVED_FILES_DIR}/${basename}.dSYM/Contents/Resources/DWARF/${binary_name}"
 
-    # Strip invalid architectures so "fat" simulator / device frameworks work on device
+    # Strip invalid architectures from the dSYM.
     if [[ "$(file "$binary")" == *"Mach-O "*"dSYM companion"* ]]; then
-      strip_invalid_archs "$binary"
+      strip_invalid_archs "$binary" "$warn_missing_arch"
     fi
-
-    if [[ $STRIP_BINARY_RETVAL == 1 ]]; then
+    if [[ $STRIP_BINARY_RETVAL == 0 ]]; then
       # Move the stripped file into its final destination.
-      echo "rsync --delete -av "${RSYNC_PROTECT_TMP_FILES[@]}" --filter \"- CVS/\" --filter \"- .svn/\" --filter \"- .git/\" --filter \"- .hg/\" --filter \"- Headers\" --filter \"- PrivateHeaders\" --filter \"- Modules\" \"${DERIVED_FILES_DIR}/${basename}.framework.dSYM\" \"${DWARF_DSYM_FOLDER_PATH}\""
-      rsync --delete -av "${RSYNC_PROTECT_TMP_FILES[@]}" --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "${DERIVED_FILES_DIR}/${basename}.framework.dSYM" "${DWARF_DSYM_FOLDER_PATH}"
+      echo "rsync --delete -av "${RSYNC_PROTECT_TMP_FILES[@]}" --links --filter \"- CVS/\" --filter \"- .svn/\" --filter \"- .git/\" --filter \"- .hg/\" --filter \"- Headers\" --filter \"- PrivateHeaders\" --filter \"- Modules\" \"${DERIVED_FILES_DIR}/${basename}.framework.dSYM\" \"${DWARF_DSYM_FOLDER_PATH}\""
+      rsync --delete -av "${RSYNC_PROTECT_TMP_FILES[@]}" --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "${DERIVED_FILES_DIR}/${basename}.dSYM" "${DWARF_DSYM_FOLDER_PATH}"
     else
       # The dSYM was not stripped at all, in this case touch a fake folder so the input/output paths from Xcode do not reexecute this script because the file is missing.
-      touch "${DWARF_DSYM_FOLDER_PATH}/${basename}.framework.dSYM"
+      mkdir -p "${DWARF_DSYM_FOLDER_PATH}"
+      touch "${DWARF_DSYM_FOLDER_PATH}/${basename}.dSYM"
     fi
   fi
+}
+
+# Used as a return value for each invocation of `strip_invalid_archs` function.
+STRIP_BINARY_RETVAL=0
+
+# Strip invalid architectures
+strip_invalid_archs() {
+  binary="$1"
+  warn_missing_arch=${2:-true}
+  # Get architectures for current target binary
+  binary_archs="$(lipo -info "$binary" | rev | cut -d ':' -f1 | awk '{$1=$1;print}' | rev)"
+  # Intersect them with the architectures we are building for
+  intersected_archs="$(echo ${ARCHS[@]} ${binary_archs[@]} | tr ' ' '\n' | sort | uniq -d)"
+  # If there are no archs supported by this binary then warn the user
+  if [[ -z "$intersected_archs" ]]; then
+    if [[ "$warn_missing_arch" == "true" ]]; then
+      echo "warning: [CP] Vendored binary '$binary' contains architectures ($binary_archs) none of which match the current build architectures ($ARCHS)."
+    fi
+    STRIP_BINARY_RETVAL=1
+    return
+  fi
+  stripped=""
+  for arch in $binary_archs; do
+    if ! [[ "${ARCHS}" == *"$arch"* ]]; then
+      # Strip non-valid architectures in-place
+      lipo -remove "$arch" -output "$binary" "$binary"
+      stripped="$stripped $arch"
+    fi
+  done
+  if [[ "$stripped" ]]; then
+    echo "Stripped $binary of architectures:$stripped"
+  fi
+  STRIP_BINARY_RETVAL=0
 }
 
 # Copies the bcsymbolmap files of a vendored framework
@@ -132,48 +175,219 @@ code_sign_if_enabled() {
   fi
 }
 
-# Strip invalid architectures
-strip_invalid_archs() {
-  binary="$1"
-  # Get architectures for current target binary
-  binary_archs="$(lipo -info "$binary" | rev | cut -d ':' -f1 | awk '{$1=$1;print}' | rev)"
-  # Intersect them with the architectures we are building for
-  intersected_archs="$(echo ${ARCHS[@]} ${binary_archs[@]} | tr ' ' '\n' | sort | uniq -d)"
-  # If there are no archs supported by this binary then warn the user
-  if [[ -z "$intersected_archs" ]]; then
-    echo "warning: [CP] Vendored binary '$binary' contains architectures ($binary_archs) none of which match the current build architectures ($ARCHS)."
-    STRIP_BINARY_RETVAL=0
-    return
-  fi
-  stripped=""
-  for arch in $binary_archs; do
-    if ! [[ "${ARCHS}" == *"$arch"* ]]; then
-      # Strip non-valid architectures in-place
-      lipo -remove "$arch" -output "$binary" "$binary"
-      stripped="$stripped $arch"
-    fi
-  done
-  if [[ "$stripped" ]]; then
-    echo "Stripped $binary of architectures:$stripped"
-  fi
-  STRIP_BINARY_RETVAL=1
-}
-
-
 if [[ "$CONFIGURATION" == "Debug" ]]; then
-  install_framework "${BUILT_PRODUCTS_DIR}/AFNetworking/AFNetworking.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/Alamofire/Alamofire.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/AwaitKit/AwaitKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/DKImagePickerController/DKImagePickerController.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/DKPhotoGallery/DKPhotoGallery.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/EllipticCurveKeyPair/EllipticCurveKeyPair.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/Groot/Groot.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/MBProgressHUD/MBProgressHUD.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/MCSwipeTableViewCell/MCSwipeTableViewCell.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/Masonry/Masonry.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/OHHTTPStubs/OHHTTPStubs.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/PromiseKit/PromiseKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-APIClient/ProtonCore_APIClient.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-AccountDeletion-V5/ProtonCore_AccountDeletion.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-AccountSwitcher-V5/ProtonCore_AccountSwitcher.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Authentication-KeyGeneration/ProtonCore_Authentication_KeyGeneration.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Authentication/ProtonCore_Authentication.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Challenge/ProtonCore_Challenge.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Common-V5/ProtonCore_Common.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-CoreTranslation/ProtonCore_CoreTranslation.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-CoreTranslation-V5/ProtonCore_CoreTranslation_V5.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-DataModel/ProtonCore_DataModel.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Doh/ProtonCore_Doh.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Environment/ProtonCore_Environment.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-FeatureSwitch/ProtonCore_FeatureSwitch.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-ForceUpgrade-V5/ProtonCore_ForceUpgrade.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Foundations/ProtonCore_Foundations.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-GoLibs/ProtonCore_Crypto.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Hash/ProtonCore_Hash.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-HumanVerification-V5/ProtonCore_HumanVerification.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Keymaker/ProtonCore_Keymaker.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Log/ProtonCore_Log.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Login/ProtonCore_Login.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-LoginUI-V5/ProtonCore_LoginUI.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Networking/ProtonCore_Networking.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Payments/ProtonCore_Payments.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-PaymentsUI-V5/ProtonCore_PaymentsUI.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Services/ProtonCore_Services.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-TroubleShooting/ProtonCore_TroubleShooting.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-UIFoundations-V5/ProtonCore_UIFoundations.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Utilities/ProtonCore_Utilities.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ReachabilitySwift/Reachability.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SDWebImage/SDWebImage.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SQLite.swift/SQLite.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SideMenuSwift/SideMenuSwift.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SkeletonView/SkeletonView.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwiftSoup/SwiftSoup.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwiftyGif/SwiftyGif.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwipyCell/SwipyCell.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/TrustKit/TrustKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/lottie-ios/Lottie.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/swift-snapshot-testing/SnapshotTesting.framework"
+  install_framework "${PODS_XCFRAMEWORKS_BUILD_DIR}/ProtonCore-OpenPGP/OpenPGP.framework"
+fi
+if [[ "$CONFIGURATION" == "Enterprise Debug" ]]; then
+  install_framework "${BUILT_PRODUCTS_DIR}/Alamofire/Alamofire.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/AwaitKit/AwaitKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/DKImagePickerController/DKImagePickerController.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/DKPhotoGallery/DKPhotoGallery.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/EllipticCurveKeyPair/EllipticCurveKeyPair.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/Groot/Groot.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/MBProgressHUD/MBProgressHUD.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/MCSwipeTableViewCell/MCSwipeTableViewCell.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/Masonry/Masonry.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/OHHTTPStubs/OHHTTPStubs.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/PromiseKit/PromiseKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-APIClient/ProtonCore_APIClient.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-AccountDeletion-V5/ProtonCore_AccountDeletion.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-AccountSwitcher-V5/ProtonCore_AccountSwitcher.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Authentication-KeyGeneration/ProtonCore_Authentication_KeyGeneration.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Authentication/ProtonCore_Authentication.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Challenge/ProtonCore_Challenge.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Common-V5/ProtonCore_Common.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-CoreTranslation/ProtonCore_CoreTranslation.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-CoreTranslation-V5/ProtonCore_CoreTranslation_V5.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-DataModel/ProtonCore_DataModel.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Doh/ProtonCore_Doh.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Environment/ProtonCore_Environment.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-FeatureSwitch/ProtonCore_FeatureSwitch.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-ForceUpgrade-V5/ProtonCore_ForceUpgrade.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Foundations/ProtonCore_Foundations.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-GoLibs/ProtonCore_Crypto.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Hash/ProtonCore_Hash.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-HumanVerification-V5/ProtonCore_HumanVerification.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Keymaker/ProtonCore_Keymaker.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Log/ProtonCore_Log.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Login/ProtonCore_Login.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-LoginUI-V5/ProtonCore_LoginUI.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Networking/ProtonCore_Networking.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Payments/ProtonCore_Payments.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-PaymentsUI-V5/ProtonCore_PaymentsUI.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Services/ProtonCore_Services.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-TroubleShooting/ProtonCore_TroubleShooting.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-UIFoundations-V5/ProtonCore_UIFoundations.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Utilities/ProtonCore_Utilities.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ReachabilitySwift/Reachability.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SDWebImage/SDWebImage.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SQLite.swift/SQLite.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SideMenuSwift/SideMenuSwift.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SkeletonView/SkeletonView.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwiftSoup/SwiftSoup.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwiftyGif/SwiftyGif.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwipyCell/SwipyCell.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/TrustKit/TrustKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/lottie-ios/Lottie.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/swift-snapshot-testing/SnapshotTesting.framework"
+  install_framework "${PODS_XCFRAMEWORKS_BUILD_DIR}/ProtonCore-OpenPGP/OpenPGP.framework"
+fi
+if [[ "$CONFIGURATION" == "Enterprise Release" ]]; then
+  install_framework "${BUILT_PRODUCTS_DIR}/Alamofire/Alamofire.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/AwaitKit/AwaitKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/DKImagePickerController/DKImagePickerController.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/DKPhotoGallery/DKPhotoGallery.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/EllipticCurveKeyPair/EllipticCurveKeyPair.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/Groot/Groot.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/MBProgressHUD/MBProgressHUD.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/MCSwipeTableViewCell/MCSwipeTableViewCell.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/Masonry/Masonry.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/PromiseKit/PromiseKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-APIClient/ProtonCore_APIClient.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-AccountDeletion-V5/ProtonCore_AccountDeletion.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-AccountSwitcher-V5/ProtonCore_AccountSwitcher.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Authentication-KeyGeneration/ProtonCore_Authentication_KeyGeneration.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Authentication/ProtonCore_Authentication.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Challenge/ProtonCore_Challenge.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Common-V5/ProtonCore_Common.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-CoreTranslation/ProtonCore_CoreTranslation.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-CoreTranslation-V5/ProtonCore_CoreTranslation_V5.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-DataModel/ProtonCore_DataModel.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Doh/ProtonCore_Doh.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Environment/ProtonCore_Environment.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-FeatureSwitch/ProtonCore_FeatureSwitch.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-ForceUpgrade-V5/ProtonCore_ForceUpgrade.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Foundations/ProtonCore_Foundations.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-GoLibs/ProtonCore_Crypto.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Hash/ProtonCore_Hash.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-HumanVerification-V5/ProtonCore_HumanVerification.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Keymaker/ProtonCore_Keymaker.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Log/ProtonCore_Log.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Login/ProtonCore_Login.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-LoginUI-V5/ProtonCore_LoginUI.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Networking/ProtonCore_Networking.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Payments/ProtonCore_Payments.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-PaymentsUI-V5/ProtonCore_PaymentsUI.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Services/ProtonCore_Services.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-TroubleShooting/ProtonCore_TroubleShooting.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-UIFoundations-V5/ProtonCore_UIFoundations.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Utilities/ProtonCore_Utilities.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ReachabilitySwift/Reachability.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SDWebImage/SDWebImage.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SQLite.swift/SQLite.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SideMenuSwift/SideMenuSwift.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SkeletonView/SkeletonView.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwiftSoup/SwiftSoup.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwiftyGif/SwiftyGif.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwipyCell/SwipyCell.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/TrustKit/TrustKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/lottie-ios/Lottie.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/swift-snapshot-testing/SnapshotTesting.framework"
+  install_framework "${PODS_XCFRAMEWORKS_BUILD_DIR}/ProtonCore-OpenPGP/OpenPGP.framework"
 fi
 if [[ "$CONFIGURATION" == "Release" ]]; then
-  install_framework "${BUILT_PRODUCTS_DIR}/AFNetworking/AFNetworking.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/Alamofire/Alamofire.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/AwaitKit/AwaitKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/DKImagePickerController/DKImagePickerController.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/DKPhotoGallery/DKPhotoGallery.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/EllipticCurveKeyPair/EllipticCurveKeyPair.framework"
   install_framework "${BUILT_PRODUCTS_DIR}/Groot/Groot.framework"
-  install_framework "${BUILT_PRODUCTS_DIR}/OHHTTPStubs/OHHTTPStubs.framework"
-fi
-if [[ "$CONFIGURATION" == "Distribution" ]]; then
-  install_framework "${BUILT_PRODUCTS_DIR}/AFNetworking/AFNetworking.framework"
-  install_framework "${BUILT_PRODUCTS_DIR}/Groot/Groot.framework"
-  install_framework "${BUILT_PRODUCTS_DIR}/OHHTTPStubs/OHHTTPStubs.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/MBProgressHUD/MBProgressHUD.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/MCSwipeTableViewCell/MCSwipeTableViewCell.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/Masonry/Masonry.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/PromiseKit/PromiseKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-APIClient/ProtonCore_APIClient.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-AccountDeletion-V5/ProtonCore_AccountDeletion.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-AccountSwitcher-V5/ProtonCore_AccountSwitcher.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Authentication-KeyGeneration/ProtonCore_Authentication_KeyGeneration.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Authentication/ProtonCore_Authentication.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Challenge/ProtonCore_Challenge.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Common-V5/ProtonCore_Common.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-CoreTranslation/ProtonCore_CoreTranslation.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-CoreTranslation-V5/ProtonCore_CoreTranslation_V5.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-DataModel/ProtonCore_DataModel.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Doh/ProtonCore_Doh.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Environment/ProtonCore_Environment.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-FeatureSwitch/ProtonCore_FeatureSwitch.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-ForceUpgrade-V5/ProtonCore_ForceUpgrade.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Foundations/ProtonCore_Foundations.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-GoLibs/ProtonCore_Crypto.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Hash/ProtonCore_Hash.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-HumanVerification-V5/ProtonCore_HumanVerification.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Keymaker/ProtonCore_Keymaker.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Log/ProtonCore_Log.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Login/ProtonCore_Login.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-LoginUI-V5/ProtonCore_LoginUI.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Networking/ProtonCore_Networking.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Payments/ProtonCore_Payments.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-PaymentsUI-V5/ProtonCore_PaymentsUI.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Services/ProtonCore_Services.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-TroubleShooting/ProtonCore_TroubleShooting.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-UIFoundations-V5/ProtonCore_UIFoundations.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ProtonCore-Utilities/ProtonCore_Utilities.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/ReachabilitySwift/Reachability.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SDWebImage/SDWebImage.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SQLite.swift/SQLite.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SideMenuSwift/SideMenuSwift.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SkeletonView/SkeletonView.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwiftSoup/SwiftSoup.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwiftyGif/SwiftyGif.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/SwipyCell/SwipyCell.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/TrustKit/TrustKit.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/lottie-ios/Lottie.framework"
+  install_framework "${BUILT_PRODUCTS_DIR}/swift-snapshot-testing/SnapshotTesting.framework"
+  install_framework "${PODS_XCFRAMEWORKS_BUILD_DIR}/ProtonCore-OpenPGP/OpenPGP.framework"
 fi
 if [ "${COCOAPODS_PARALLEL_CODE_SIGN}" == "true" ]; then
   wait

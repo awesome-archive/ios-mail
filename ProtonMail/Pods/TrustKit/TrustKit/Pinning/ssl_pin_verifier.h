@@ -9,7 +9,7 @@
  
  */
 
-#import "../TSKTrustDecision.h"
+#import "../public/TSKTrustDecision.h"
 #if __has_feature(modules)
 @import Foundation;
 #else
@@ -22,4 +22,6 @@
 TSKTrustEvaluationResult verifyPublicKeyPin(SecTrustRef _Nonnull serverTrust,
                                             NSString * _Nonnull serverHostname,
                                             NSSet<NSData *> * _Nonnull knownPins,
-                                            TSKSPKIHashCache * _Nullable hashCache);
+                                            TSKSPKIHashCache * _Nullable hashCache,
+                                            BOOL noSSLValidation,
+                                            BOOL noVerifyHostname);
